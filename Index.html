@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Link Cá Nhân Tùy Chỉnh (Giao Diện Premium)</title>
+    <!-- Tải Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tải icon thư viện Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Tùy chỉnh font chữ Inter và nền mặc định */
+        body {
+            font-family: 'Inter', sans-serif;
+            color: #c9d1d9;
+            min-height: 100vh;
+            background-size: cover;
+            background-attachment: fixed;
+            background-position: center;
+            transition: background-color 0.5s, background-image 0.5s;
+            /* Nền mặc định đẹp hơn: một gradient tối nhẹ */
+            background-color: #0d1117;
+            background-image: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+        }
+        /* Gradient overlay cho nền tối (để chữ dễ đọc hơn và tạo độ tương phản) */
+        .overlay {
+            background-color: rgba(0, 0, 0, 0.3); /* Nhẹ hơn để thấy nền */
+            min-height: 100vh;
+        }
+
+        /* Container Chính tạo độ sâu */
+        #app-container {
+            background: rgba(17, 24, 39, 0.6); /* Nền tối mờ */
+            backdrop-filter: blur(5px);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7);
+        }
+
+        /* Style cho nút liên kết và text block */
+        .link-item {
+            cursor: grab;
+            transition: all 0.2s;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+            position: relative;
+            border: 1px solid #30363d; /* Viền tinh tế */
+        }
+        .link-item:active {
+            cursor: grabbing;
+        }
+        .link-item:hover {
+            transform: translateY(-3px); /* Hiệu ứng nổi nhẹ */
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5);
+            border-color: #6366f1; /* Viền nổi bật hơn */
+        }
+        .dragging {
+            opacity: 0.5;
+            border: 2px dashed #6366f1;
+        }
+
+        /* Style cho khu vực chỉnh sửa link */
+        .item-edit-controls {
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .link-item:hover .item-edit-controls,
+        .text-block-item:hover .item-edit-controls {
+            opacity: 1;
+        }
+
+        /* Text Block Styling */
+        .text-block-item {
+            cursor: grab;
+            padding: 1rem;
+            border: 1px solid #30363d;
+            border-radius: 0.75rem;
+            transition: border-color 0.2s;
+            background-color: #1f2937; /* Nền khối văn bản tối hơn một chút */
+        }
+        .text-block-item[contenteditable="true"]:focus {
+            outline: none;
+            border-color: #6366f1;
+            background-color: #2c384a;
+        }
+    </style>
+</head>
+<body>
+    <div class="overlay flex flex-col items-center p-4 sm:p-8">
+
+        <!-- Container Chính -->
+        <div id="app-container" class="w-full max-w-lg mx-auto">
+
+            <!-- Thông báo Trạng thái (Loading/Error) -->
+            <div id="status-message" class="fixed top-0 left-0 right-0 p-3 text-center bg-indigo-600 text-white hidden z-50">
+                Đang tải...
+            </div>
+
+            <!-- Phần Hồ Sơ (Profile) -->
+            <header id="profile-section" class="flex flex-col items-center mb-8">
+                <!-- Ảnh đại diện -->
+                <img id="profile-image" 
+                     src="https://placehold.co/128x128/30363d/c9d1d9?text=AVT" 
+                     alt="Ảnh đại diện" 
+                     class="w-32 h-32 rounded-full border-4 border-indigo-500/50 object-cover shadow-2xl mb-4">
+
+                <!-- Tên người dùng (Có thể chỉnh sửa) -->
+                <h1 id="user-name" contenteditable="true" 
+                    class="text-3xl font-bold text-white mb-1 cursor-pointer hover:bg-gray-700/50 p-1 rounded-lg transition"
+                    data-key="name" title="Nhấp để chỉnh sửa tên">
+                    Tên Của Bạn
+                </h1>
+
+                <!-- Bio/Mô tả ngắn (Có thể chỉnh sửa) -->
+                <p id="user-bio" contenteditable="true" 
+                   class="text-gray-400 text-sm italic text-center px-4 cursor-pointer hover:bg-gray-800/50 p-1 rounded-lg transition"
+                   data-key="bio" title="Nhấp để chỉnh sửa mô tả">
+                    Kéo thả để sắp xếp!
+                </p>
+                
+                <!-- Công khai Link (Simulated Public URL) -->
+                <div class="mt-4 w-full max-w-sm flex items-center bg-gray-700/70 p-2 rounded-xl border border-gray-600 shadow-md">
+                    <p id="public-link-display" class="text-sm text-indigo-300 font-mono overflow-hidden whitespace-nowrap overflow-ellipsis flex-grow px-2" title="Liên kết Công khai của bạn">
+                        <!-- Link sẽ được chèn vào đây -->
+                    </p>
+                    <button id="copy-link-button" class="flex-shrink-0 bg-indigo-500 hover:bg-indigo-600 text-white p-1.5 rounded-lg transition" title="Sao chép liên kết">
+                        <i data-lucide="copy" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <div class="mt-6 flex space-x-3">
+                    <button id="add-link-button" class="flex items-center bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-full text-sm transition shadow-lg transform hover:scale-[1.03]">
+                        <i data-lucide="link" class="w-4 h-4 mr-1.5"></i> Thêm Link
+                    </button>
+                    <button id="add-text-button" class="flex items-center bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-full text-sm transition shadow-lg transform hover:scale-[1.03]">
+                        <i data-lucide="text" class="w-4 h-4 mr-1.5"></i> Thêm Văn Bản
+                    </button>
+                    <button id="customize-background-button" class="flex items-center bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-full text-sm transition shadow-lg transform hover:scale-[1.03]">
+                        <i data-lucide="palette" class="w-4 h-4 mr-1.5"></i> Nền
+                    </button>
+                </div>
+            </header>
+
+            <!-- Phần Danh Sách Liên Kết & Văn Bản (Kéo Thả) -->
+            <section id="links-container" class="space-y-4 min-h-[50px] p-4 rounded-xl border border-dashed border-gray-700 bg-gray-900/40">
+                <!-- Liên kết/Văn bản sẽ được thêm vào đây bằng JavaScript -->
+                <p class="text-center text-gray-500 text-sm italic py-4">Kéo và thả để sắp xếp nội dung.</p>
+            </section>
+            
+            <!-- Chân trang (Footer) -->
+            <footer class="mt-12 text-center text-gray-500 text-xs">
+                <p>Được tạo bởi Gemini | <span id="user-id-display"></span></p>
+                <p id="app-id-display" class="text-gray-600 mt-1"></p>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Modal Thêm/Chỉnh Sửa Liên Kết (Giữ nguyên giao diện Dark Mode) -->
+    <div id="link-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-gray-800 w-full max-w-md p-6 rounded-xl shadow-2xl border border-gray-700">
+            <h2 id="modal-title" class="text-xl font-bold mb-4 text-white">Thêm Liên Kết Mới</h2>
+            
+            <form id="link-form" class="space-y-4">
+                <input type="hidden" id="link-id">
+                
+                <div>
+                    <label for="link-name" class="block text-sm font-medium text-gray-300 mb-1">Tên Hiển Thị</label>
+                    <input type="text" id="link-name" required 
+                           class="w-full p-2 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                
+                <div>
+                    <label for="link-url" class="block text-sm font-medium text-gray-300 mb-1">URL (Liên kết)</label>
+                    <input type="url" id="link-url" required 
+                           class="w-full p-2 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                
+                <div>
+                    <label for="link-icon" class="block text-sm font-medium text-gray-300 mb-1">Icon (ví dụ: globe, youtube, twitter)</label>
+                    <input type="text" id="link-icon" placeholder="Tên icon Lucide (tùy chọn)"
+                           class="w-full p-2 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" id="delete-link-button" class="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg hidden transition">
+                        Xóa
+                    </button>
+                    <button type="button" id="close-link-modal-button" class="bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg transition">
+                        Hủy
+                    </button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition">
+                        Lưu Liên Kết
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal Tùy Chỉnh Nền (Giữ nguyên giao diện Dark Mode) -->
+    <div id="bg-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-gray-800 w-full max-w-md p-6 rounded-xl shadow-2xl border border-gray-700">
+            <h2 class="text-xl font-bold mb-4 text-white">Tùy Chỉnh Nền</h2>
+            
+            <form id="bg-form" class="space-y-4">
+                <p class="text-gray-400 text-sm">Chọn Nền Màu hoặc Nền Ảnh tùy chỉnh của bạn.</p>
+                
+                <div>
+                    <label for="bg-type" class="block text-sm font-medium text-gray-300 mb-1">Loại Nền</label>
+                    <select id="bg-type" class="w-full p-2 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="default">Mặc định (Gradient Tối)</option>
+                        <option value="color">Màu sắc tùy chỉnh</option>
+                        <option value="image_url">Hình ảnh (URL)</option>
+                        <option value="image_upload">Tải ảnh lên từ máy tính</option>
+                    </select>
+                </div>
+
+                <div id="bg-color-field" class="hidden">
+                    <label for="bg-color" class="block text-sm font-medium text-gray-300 mb-1">Mã Màu (CSS)</label>
+                    <input type="text" id="bg-color" placeholder="#0d1117"
+                           class="w-full p-2 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                
+                <div id="bg-image-url-field" class="hidden">
+                    <label for="bg-image-url" class="block text-sm font-medium text-gray-300 mb-1">URL Hình Ảnh</label>
+                    <input type="url" id="bg-image-url" placeholder="https://..."
+                           class="w-full p-2 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+
+                <div id="bg-image-upload-field" class="hidden">
+                    <label for="bg-image-file" class="block text-sm font-medium text-gray-300 mb-1">Chọn Ảnh Từ Máy Tính</label>
+                    <input type="file" id="bg-image-file" accept="image/*"
+                           class="w-full p-2 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-indigo-500 focus:border-indigo-500">
+                    <p class="text-xs text-red-400 mt-1">Lưu ý: Kích thước tệp tối đa: 5MB.</p>
+                </div>
+                
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" id="close-bg-modal-button" class="bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg transition">
+                        Hủy
+                    </button>
+                    <button type="submit" id="apply-bg-button" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition">
+                        Áp Dụng Nền
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, collection, query, orderBy, writeBatch, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        
+        // --- GLOBAL VARIABLES & INITIALIZATION ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        let db, auth, storage, userId = null;
+        let linksData = []; 
+        let isAuthReady = false;
+
+        // Caching DOM elements
+        const bodyEl = document.body;
+        const linksContainer = document.getElementById('links-container');
+        const statusMessage = document.getElementById('status-message');
+        const linkModal = document.getElementById('link-modal');
+        const linkForm = document.getElementById('link-form');
+        const bgModal = document.getElementById('bg-modal');
+        const bgForm = document.getElementById('bg-form');
+        
+        const profileNameEl = document.getElementById('user-name');
+        const profileBioEl = document.getElementById('user-bio');
+
+        const PUBLIC_BASE_URL = 'https://linkbio.app/'; // URL cơ sở mô phỏng
+        const BG_DEFAULT_COLOR = '#0d1117';
+        const BG_DEFAULT_GRADIENT = 'linear-gradient(135deg, #0d1117 0%, #161b22 100%)';
+
+        // --- FIREBASE SETUP ---
+
+        function getProfileDocRef() {
+            return doc(db, `artifacts/${appId}/users/${userId}/profile`, 'main');
+        }
+        
+        function getLinksCollectionRef() {
+            return collection(db, `artifacts/${appId}/users/${userId}/links`);
+        }
+
+        /**
+         * Tạo một chuỗi ngẫu nhiên (slug) gồm 8 ký tự chữ và số.
+         * @returns {string} Slug ngẫu nhiên
+         */
+        function generateRandomSlug(length = 8) {
+            const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += characters.charAt(Math.floor(Math.random() * characters.length));
+            }
+            return result;
+        }
+
+        async function initFirebase() {
+            if (!firebaseConfig) {
+                console.error("Lỗi: Firebase config bị thiếu.");
+                return;
+            }
+
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            storage = getStorage(app); 
+            
+            // Xử lý trạng thái xác thực
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    userId = user.uid;
+                } else {
+                    try {
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                        userId = auth.currentUser?.uid || crypto.randomUUID();
+                    } catch (error) {
+                        console.error("Lỗi xác thực:", error);
+                        userId = crypto.randomUUID(); 
+                    }
+                }
+                
+                isAuthReady = true;
+                document.getElementById('user-id-display').textContent = `User ID: ${userId.substring(0, 8)}...`;
+                document.getElementById('app-id-display').textContent = `App ID: ${appId}`;
+                
+                startListeners();
+            });
+        }
+
+        // --- FIRESTORE LISTENERS ---
+        
+        /**
+         * Sao chép văn bản vào clipboard (tương thích với iFrame)
+         * @param {string} text 
+         */
+        function copyToClipboard(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+                const successful = document.execCommand('copy');
+                showTemporaryMessage(successful ? "Đã sao chép liên kết công khai!" : "Lỗi sao chép.", 'bg-green-600');
+            } catch (err) {
+                console.error('Lỗi sao chép', err);
+                showTemporaryMessage("Lỗi sao chép. Vui lòng thử lại.", 'bg-red-600');
+            }
+            document.body.removeChild(textarea);
+        }
+
+        /**
+         * Hiển thị URL công khai và gán sự kiện sao chép
+         * @param {string} slug 
+         */
+        function displayPublicLink(slug) {
+            const fullUrl = PUBLIC_BASE_URL + slug;
+            document.getElementById('public-link-display').textContent = fullUrl;
+
+            const copyButton = document.getElementById('copy-link-button');
+            copyButton.onclick = () => copyToClipboard(fullUrl);
+            lucide.createIcons(); // Tạo lại icon copy
+        }
+
+
+        function applyBackground(background) {
+            // Reset style
+            bodyEl.style.backgroundColor = BG_DEFAULT_COLOR;
+            bodyEl.style.backgroundImage = BG_DEFAULT_GRADIENT;
+
+            if (!background) {
+                return;
+            }
+
+            if (background.type === 'color' && background.value) {
+                bodyEl.style.backgroundImage = 'none'; // Xóa gradient mặc định
+                bodyEl.style.backgroundColor = background.value;
+            } else if ((background.type === 'image_url' || background.type === 'image_upload') && background.value) {
+                bodyEl.style.backgroundImage = `url('${background.value}')`;
+                bodyEl.style.backgroundColor = 'transparent'; 
+            } else if (background.type === 'default') {
+                // Giữ nguyên mặc định (gradient)
+            }
+        }
+
+        function startListeners() {
+            if (!isAuthReady || !userId) return;
+
+            // 1. Lắng nghe dữ liệu Hồ sơ (Profile)
+            onSnapshot(getProfileDocRef(), async (docSnapshot) => {
+                let publicSlug = null;
+                if (docSnapshot.exists()) {
+                    const data = docSnapshot.data();
+                    profileNameEl.textContent = data.name || "Tên Của Bạn";
+                    profileBioEl.textContent = data.bio || "Thêm mô tả ngắn của bạn ở đây.";
+                    
+                    const imgUrl = data.imageUrl || "https://placehold.co/128x128/30363d/c9d1d9?text=AVT";
+                    document.getElementById('profile-image').src = imgUrl;
+
+                    // Xử lý Public Slug (tạo mới nếu chưa có)
+                    publicSlug = data.publicSlug;
+                    if (!publicSlug) {
+                        publicSlug = generateRandomSlug();
+                        // Lưu ngay lập tức
+                        await setProfileData({ publicSlug: publicSlug }); 
+                    }
+                    displayPublicLink(publicSlug);
+
+                    // Áp dụng nền
+                    applyBackground(data.background);
+                } else {
+                    // Khởi tạo hồ sơ nếu chưa có
+                    publicSlug = generateRandomSlug();
+                    await setProfileData({ 
+                        name: "Tên Của Bạn", 
+                        bio: "Thêm mô tả ngắn của bạn ở đây.", 
+                        background: { type: 'default', value: null },
+                        publicSlug: publicSlug // Lưu slug mới
+                    });
+                    displayPublicLink(publicSlug);
+                }
+            }, (error) => {
+                console.error("Lỗi lắng nghe hồ sơ:", error);
+            });
+
+            // 2. Lắng nghe dữ liệu Liên kết & Text Block
+            const q = query(getLinksCollectionRef(), orderBy('order', 'asc')); 
+            
+            onSnapshot(q, (snapshot) => {
+                statusMessage.classList.add('hidden'); 
+                linksData = [];
+                snapshot.forEach((doc) => {
+                    linksData.push({ id: doc.id, ...doc.data() });
+                });
+                renderItems();
+            }, (error) => {
+                console.error("Lỗi tải liên kết:", error);
+                showTemporaryMessage("Lỗi tải liên kết!", 'bg-red-600');
+            });
+        }
+
+        // --- CRUD & IMAGE UPLOAD OPERATIONS ---
+
+        async function setProfileData(data) {
+            try {
+                await setDoc(getProfileDocRef(), data, { merge: true });
+            } catch (error) {
+                console.error("Lỗi cập nhật hồ sơ:", error);
+            }
+        }
+        
+        async function handleImageUploadAndSave(file) {
+            if (!file) return;
+
+            if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                 showTemporaryMessage("Lỗi: Kích thước tệp tối đa là 5MB.", 'bg-red-600');
+                 return;
+            }
+
+            showTemporaryMessage("Đang tải ảnh lên...", 'bg-yellow-600');
+            const fileExtension = file.name.split('.').pop();
+            const storagePath = `backgrounds/${userId}/${Date.now()}.${fileExtension}`;
+            const storageRef = ref(storage, storagePath);
+
+            try {
+                // 1. Upload file
+                const snapshot = await uploadBytes(storageRef, file);
+                
+                // 2. Get download URL
+                const downloadURL = await getDownloadURL(snapshot.ref);
+
+                // 3. Save URL to Firestore
+                await setProfileData({ background: { type: 'image_upload', value: downloadURL } });
+
+                showTemporaryMessage("Tải ảnh nền thành công!", 'bg-green-600');
+                closeModal(bgModal);
+
+            } catch (error) {
+                console.error("Lỗi tải ảnh lên:", error);
+                showTemporaryMessage("Lỗi tải ảnh lên. Vui lòng thử lại.", 'bg-red-600');
+            }
+        }
+
+        function showTemporaryMessage(message, colorClass = 'bg-indigo-600') {
+            statusMessage.textContent = message;
+            statusMessage.className = `fixed top-0 left-0 right-0 p-3 text-center text-white z-50 ${colorClass}`;
+            statusMessage.classList.remove('hidden');
+            setTimeout(() => {
+                statusMessage.classList.add('hidden');
+            }, 3000);
+        }
+
+        async function saveLink(linkId, data) {
+            showTemporaryMessage("Đang lưu liên kết...");
+            try {
+                if (linkId) {
+                    await updateDoc(doc(getLinksCollectionRef(), linkId), data);
+                } else {
+                    const newOrder = linksData.length > 0 ? linksData[linksData.length - 1].order + 1 : 0;
+                    await addDoc(getLinksCollectionRef(), { ...data, type: 'link', order: newOrder });
+                }
+                closeModal(linkModal);
+            } catch (error) {
+                console.error("Lỗi lưu liên kết:", error);
+                showTemporaryMessage("Lỗi: Không thể lưu liên kết!", 'bg-red-600');
+            }
+        }
+
+        async function addTextBlock() {
+            showTemporaryMessage("Đang thêm văn bản...");
+            try {
+                const newOrder = linksData.length > 0 ? linksData[linksData.length - 1].order + 1 : 0;
+                await addDoc(getLinksCollectionRef(), { 
+                    type: 'text_block', 
+                    content: "Nhấp để chỉnh sửa nội dung văn bản này.",
+                    order: newOrder
+                });
+            } catch (error) {
+                console.error("Lỗi thêm văn bản:", error);
+                showTemporaryMessage("Lỗi: Không thể thêm văn bản!", 'bg-red-600');
+            }
+        }
+
+        async function updateTextBlockContent(itemId, content) {
+             try {
+                await updateDoc(doc(getLinksCollectionRef(), itemId), { content });
+            } catch (error) {
+                console.error("Lỗi cập nhật văn bản:", error);
+            }
+        }
+
+        async function deleteItem(itemId) {
+            if (!itemId) return;
+
+            if (confirm("Bạn có chắc chắn muốn xóa mục này?")) {
+                showTemporaryMessage("Đang xóa mục...");
+                try {
+                    await deleteDoc(doc(getLinksCollectionRef(), itemId));
+                    closeModal(linkModal);
+                } catch (error) {
+                    console.error("Lỗi xóa mục:", error);
+                    showTemporaryMessage("Lỗi: Không thể xóa mục!", 'bg-red-600');
+                }
+            }
+        }
+
+        async function updateItemOrderInFirestore() {
+            if (!db) return;
+            
+            showTemporaryMessage("Đang cập nhật thứ tự...", 'bg-yellow-600');
+
+            try {
+                const batch = writeBatch(db);
+                
+                linksData.forEach((item, index) => {
+                    const docRef = doc(getLinksCollectionRef(), item.id);
+                    batch.update(docRef, { order: index });
+                });
+                
+                await batch.commit();
+            } catch (error) {
+                console.error("Lỗi cập nhật thứ tự:", error);
+                showTemporaryMessage("Lỗi: Không thể cập nhật thứ tự!", 'bg-red-600');
+            }
+        }
+
+        // --- DRAG AND DROP (Kéo Thả) ---
+        let draggedItem = null;
+
+        function handleDragStart(e) {
+            draggedItem = e.currentTarget;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', draggedItem.innerHTML);
+            setTimeout(() => e.currentTarget.classList.add('dragging'), 0); 
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault(); 
+            e.dataTransfer.dropEffect = 'move';
+
+            const target = e.currentTarget;
+            if (target && draggedItem && target !== draggedItem) {
+                linksContainer.querySelectorAll('.drop-placeholder').forEach(p => p.remove());
+
+                const targetRect = target.getBoundingClientRect();
+                const targetCenterY = targetRect.y + targetRect.height / 2;
+                
+                const placeholder = document.createElement('div');
+                placeholder.className = 'drop-placeholder h-1 bg-indigo-500 rounded-full transition-all duration-150';
+                
+                if (e.clientY < targetCenterY) {
+                    linksContainer.insertBefore(placeholder, target);
+                } else {
+                    linksContainer.insertBefore(placeholder, target.nextSibling);
+                }
+            }
+        }
+        
+        function handleDragLeave(e) {
+            linksContainer.querySelectorAll('.drop-placeholder').forEach(p => p.remove());
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            linksContainer.querySelectorAll('.drop-placeholder').forEach(p => p.remove());
+
+            if (draggedItem) {
+                const dropTarget = e.currentTarget;
+                
+                const children = Array.from(linksContainer.children).filter(el => !el.classList.contains('drop-placeholder'));
+                
+                const oldIndex = children.indexOf(draggedItem);
+                let newIndex = children.indexOf(dropTarget);
+
+                if (e.clientY < dropTarget.getBoundingClientRect().y + dropTarget.getBoundingClientRect().height / 2) {
+                    linksContainer.insertBefore(draggedItem, dropTarget);
+                } else {
+                    linksContainer.insertBefore(draggedItem, dropTarget.nextSibling);
+                    newIndex++; 
+                }
+                
+                const [movedItem] = linksData.splice(oldIndex, 1);
+                linksData.splice(newIndex > oldIndex ? newIndex - 1 : newIndex, 0, movedItem);
+
+                updateItemOrderInFirestore();
+            }
+        }
+
+        function handleDragEnd(e) {
+            e.currentTarget.classList.remove('dragging');
+            draggedItem = null;
+            linksContainer.querySelectorAll('.drop-placeholder').forEach(p => p.remove());
+        }
+
+
+        // --- UI RENDERING & MODAL HANDLING ---
+
+        function renderItems() {
+            linksContainer.innerHTML = '';
+            if (linksData.length === 0) {
+                 linksContainer.innerHTML = '<p class="text-center text-gray-500 text-sm italic py-4">Chưa có nội dung nào. Hãy thêm Link hoặc Văn Bản!</p>';
+                 return;
+            }
+
+            linksData.forEach(item => {
+                const wrapper = document.createElement('div');
+                wrapper.id = item.id;
+                wrapper.setAttribute('draggable', true);
+                wrapper.addEventListener('dragstart', handleDragStart);
+                wrapper.addEventListener('dragover', handleDragOver);
+                wrapper.addEventListener('dragleave', handleDragLeave);
+                wrapper.addEventListener('drop', handleDrop);
+                wrapper.addEventListener('dragend', handleDragEnd);
+
+                if (item.type === 'link') {
+                    // --- RENDER LINK ---
+                    wrapper.className = 'link-item flex items-center w-full p-4 rounded-xl border border-gray-700 bg-gray-800 text-lg font-semibold text-gray-100 hover:bg-gray-700 hover:border-indigo-500 cursor-grab relative group';
+                    
+                    const iconName = item.icon || 'link';
+                    const iconHtml = `<i data-lucide="${iconName}" class="w-6 h-6 mr-3 text-indigo-400"></i>`;
+
+                    const linkContent = document.createElement('a');
+                    linkContent.href = item.url;
+                    linkContent.target = "_blank";
+                    linkContent.className = 'flex-grow flex items-center min-h-[24px]'; 
+                    linkContent.innerHTML = iconHtml + item.name;
+                    wrapper.appendChild(linkContent);
+                    
+                    const editButton = createEditButton('pencil', 'Chỉnh sửa liên kết', () => openLinkModal(item.id));
+                    wrapper.appendChild(createControlsContainer([editButton]));
+
+                } else if (item.type === 'text_block') {
+                    // --- RENDER TEXT BLOCK ---
+                    wrapper.className = 'text-block-item bg-gray-900/50 text-base text-gray-300 relative group cursor-grab';
+                    wrapper.innerHTML = item.content || 'Nhấp để chỉnh sửa nội dung...';
+                    wrapper.setAttribute('contenteditable', 'true');
+                    wrapper.title = 'Nhấp và chỉnh sửa trực tiếp, sau đó nhấp ra ngoài để lưu.';
+                    
+                    wrapper.addEventListener('blur', (e) => {
+                        const newContent = e.target.textContent.trim();
+                        if (newContent !== item.content) {
+                            updateTextBlockContent(item.id, newContent);
+                        }
+                    });
+                    wrapper.addEventListener('keypress', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            e.target.blur(); 
+                        }
+                    });
+
+                    const deleteButton = createEditButton('trash-2', 'Xóa văn bản', () => deleteItem(item.id));
+                    wrapper.appendChild(createControlsContainer([deleteButton]));
+                }
+
+                linksContainer.appendChild(wrapper);
+            });
+            
+            lucide.createIcons();
+        }
+
+        function createControlsContainer(buttons) {
+            const controls = document.createElement('div');
+            controls.className = 'item-edit-controls absolute top-1/2 right-2 -translate-y-1/2 flex space-x-2 bg-gray-800 p-1 rounded-full border border-gray-700';
+
+            const dragHandle = document.createElement('div');
+            dragHandle.className = 'p-1 rounded-full text-white cursor-grab';
+            dragHandle.innerHTML = '<i data-lucide="grip-vertical" class="w-4 h-4"></i>';
+            dragHandle.title = "Kéo để sắp xếp";
+            controls.appendChild(dragHandle);
+
+            buttons.forEach(btn => controls.appendChild(btn));
+            return controls;
+        }
+
+        function createEditButton(icon, title, onClick) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'p-1 rounded-full bg-gray-600 hover:bg-indigo-500 transition';
+            button.innerHTML = `<i data-lucide="${icon}" class="w-4 h-4 text-white"></i>`;
+            button.title = title;
+            button.addEventListener('click', (e) => {
+                e.preventDefault();
+                onClick();
+            });
+            return button;
+        }
+
+        function openModal(modalEl) {
+            modalEl.classList.remove('hidden');
+        }
+
+        function closeModal(modalEl) {
+            modalEl.classList.add('hidden');
+        }
+        
+        function openLinkModal(linkId = null) {
+            linkForm.reset();
+            document.getElementById('link-id').value = '';
+            document.getElementById('modal-title').textContent = "Thêm Liên Kết Mới";
+            document.getElementById('delete-link-button').classList.add('hidden');
+            
+            if (linkId) {
+                const link = linksData.find(l => l.id === linkId && l.type === 'link');
+                if (link) {
+                    document.getElementById('link-id').value = linkId;
+                    document.getElementById('link-name').value = link.name;
+                    document.getElementById('link-url').value = link.url;
+                    document.getElementById('link-icon').value = link.icon || '';
+                    document.getElementById('modal-title').textContent = "Chỉnh Sửa Liên Kết";
+                    document.getElementById('delete-link-button').classList.remove('hidden');
+                }
+            }
+            openModal(linkModal);
+        }
+
+        function openBackgroundModal() {
+            // Đặt lại các trường về trạng thái ban đầu
+            document.getElementById('bg-color').value = '';
+            document.getElementById('bg-image-url').value = '';
+            document.getElementById('bg-image-file').value = '';
+            
+            // Đặt loại nền dựa trên trạng thái hiện tại (nếu có thể)
+            const profileRef = getProfileDocRef();
+            getDoc(profileRef).then(docSnap => {
+                if (docSnap.exists()) {
+                    const bg = docSnap.data().background;
+                    const bgTypeEl = document.getElementById('bg-type');
+                    if (bg) {
+                        bgTypeEl.value = bg.type || 'default';
+                        if (bg.type === 'color') {
+                            document.getElementById('bg-color').value = bg.value;
+                        } else if (bg.type === 'image_url') {
+                            document.getElementById('bg-image-url').value = bg.value;
+                        }
+                    } else {
+                         bgTypeEl.value = 'default';
+                    }
+                    toggleBgFields();
+                }
+            });
+
+            openModal(bgModal);
+        }
+
+        function toggleBgFields() {
+            const bgType = document.getElementById('bg-type').value;
+            document.getElementById('bg-color-field').classList.toggle('hidden', bgType !== 'color');
+            document.getElementById('bg-image-url-field').classList.toggle('hidden', bgType !== 'image_url');
+            document.getElementById('bg-image-upload-field').classList.toggle('hidden', bgType !== 'image_upload');
+        }
+
+
+        // --- EVENT LISTENERS ---
+        
+        document.getElementById('add-link-button').addEventListener('click', () => openLinkModal());
+        document.getElementById('add-text-button').addEventListener('click', addTextBlock);
+        document.getElementById('customize-background-button').addEventListener('click', openBackgroundModal);
+        
+        document.getElementById('bg-type').addEventListener('change', toggleBgFields);
+        document.getElementById('close-bg-modal-button').addEventListener('click', () => closeModal(bgModal));
+        document.getElementById('close-link-modal-button').addEventListener('click', () => closeModal(linkModal));
+
+
+        // Xử lý Form Lưu Background
+        bgForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const type = document.getElementById('bg-type').value;
+
+            if (type === 'image_upload') {
+                const fileInput = document.getElementById('bg-image-file');
+                const file = fileInput.files[0];
+                if (file) {
+                    handleImageUploadAndSave(file);
+                } else {
+                    showTemporaryMessage("Vui lòng chọn tệp ảnh để tải lên.", 'bg-red-600');
+                }
+                return;
+            }
+
+            let value = null;
+            if (type === 'color') {
+                value = document.getElementById('bg-color').value.trim() || BG_DEFAULT_COLOR;
+            } else if (type === 'image_url') {
+                value = document.getElementById('bg-image-url').value.trim();
+                if (!value) {
+                     showTemporaryMessage("Vui lòng nhập URL ảnh!", 'bg-red-600');
+                     return;
+                }
+            } else if (type === 'default') {
+                value = null; // Sẽ áp dụng gradient mặc định
+            }
+
+            setProfileData({ background: { type, value } });
+            closeModal(bgModal);
+        });
+
+        document.getElementById('delete-link-button').addEventListener('click', () => {
+            const linkId = document.getElementById('link-id').value;
+            if (linkId) {
+                deleteItem(linkId);
+            }
+        });
+
+        document.getElementById('link-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const linkId = document.getElementById('link-id').value;
+            const name = document.getElementById('link-name').value.trim();
+            const url = document.getElementById('link-url').value.trim();
+            const icon = document.getElementById('link-icon').value.trim();
+
+            if (name && url) {
+                saveLink(linkId, { name, url, icon });
+            }
+        });
+
+        [profileNameEl, profileBioEl].forEach(el => {
+            el.addEventListener('blur', (e) => {
+                const key = e.target.getAttribute('data-key');
+                const value = e.target.textContent.trim();
+                if (key && value) {
+                    setProfileData({ [key]: value });
+                }
+            });
+            el.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.target.blur();
+                }
+            });
+        });
+
+
+        // --- START APP ---
+        document.addEventListener('DOMContentLoaded', () => {
+            statusMessage.textContent = "Đang kết nối Firebase...";
+            statusMessage.classList.remove('hidden');
+            initFirebase();
+        });
+
+    </script>
+
+</body>
+</html>
+
