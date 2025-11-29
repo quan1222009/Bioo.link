@@ -272,7 +272,9 @@
         const profileNameEl = document.getElementById('user-name');
         const profileBioEl = document.getElementById('user-bio');
 
-        const PUBLIC_BASE_URL = 'https://linkbio.app/'; // URL cơ sở mô phỏng
+        // CẬP NHẬT: Sử dụng URL Render thực tế của người dùng
+        const PUBLIC_BASE_URL = 'https://bioo-link.onrender.com/'; 
+        
         const BG_DEFAULT_COLOR = '#0d1117';
         const BG_DEFAULT_GRADIENT = 'linear-gradient(135deg, #0d1117 0%, #161b22 100%)';
 
@@ -296,7 +298,8 @@
             for (let i = 0; i < length; i++) {
                 result += characters.charAt(Math.floor(Math.random() * characters.length));
             }
-            return result;
+            // Thêm dấu / để đảm bảo nó là đường dẫn con
+            return "/" + result; 
         }
 
         async function initFirebase() {
@@ -362,7 +365,8 @@
          * @param {string} slug 
          */
         function displayPublicLink(slug) {
-            const fullUrl = PUBLIC_BASE_URL + slug;
+            // Slug là "/randomstring", nên thêm trực tiếp vào base URL
+            const fullUrl = PUBLIC_BASE_URL + (slug.startsWith('/') ? slug.substring(1) : slug); 
             document.getElementById('public-link-display').textContent = fullUrl;
 
             const copyButton = document.getElementById('copy-link-button');
