@@ -82,6 +82,20 @@
             border-color: #6366f1;
             background-color: #2c384a;
         }
+        
+        /* Loading Spinner */
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top: 4px solid #6366f1;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -119,7 +133,7 @@
                 
                 <!-- Công khai Link (Simulated Public URL) -->
                 <div class="mt-4 w-full max-w-sm flex items-center bg-gray-700/70 p-2 rounded-xl border border-gray-600 shadow-md">
-                    <p id="public-link-display" class="text-sm text-indigo-300 font-mono overflow-hidden whitespace-nowrap overflow-ellipsis flex-grow px-2" title="Liên kết Công khai của bạn">
+                    <p id="public-link-display" class="text-sm text-indigo-300 font-mono overflow-hidden whitespace-nowrap overflow-ellipsis flex-grow px-2" title="Liên kết Công khai của bạn (Giả lập)">
                         <!-- Link sẽ được chèn vào đây -->
                     </p>
                     <button id="copy-link-button" class="flex-shrink-0 bg-indigo-500 hover:bg-indigo-600 text-white p-1.5 rounded-lg transition" title="Sao chép liên kết">
@@ -141,14 +155,18 @@
             </header>
 
             <!-- Phần Danh Sách Liên Kết & Văn Bản (Kéo Thả) -->
-            <section id="links-container" class="space-y-4 min-h-[50px] p-4 rounded-xl border border-dashed border-gray-700 bg-gray-900/40">
-                <!-- Liên kết/Văn bản sẽ được thêm vào đây bằng JavaScript -->
-                <p class="text-center text-gray-500 text-sm italic py-4">Kéo và thả để sắp xếp nội dung.</p>
+            <section id="links-container" class="space-y-4 min-h-[50px] p-4 rounded-xl border border-dashed border-gray-700 bg-gray-900/40 flex flex-col items-center justify-center">
+                <!-- Trạng thái tải: Chỉ hiển thị khi đang chờ data -->
+                <div id="loading-state" class="flex flex-col items-center justify-center py-8">
+                    <div class="spinner mb-3"></div>
+                    <p class="text-gray-400">Đang tải dữ liệu của bạn...</p>
+                </div>
+                <!-- Nội dung sẽ được thêm vào đây bằng JavaScript -->
             </section>
             
             <!-- Chân trang (Footer) -->
             <footer class="mt-12 text-center text-gray-500 text-xs">
-                <p>Được tạo bởi Gemini | <span id="user-id-display"></span></p>
+                <p>Được tạo bởi DVS ROBLOX | <span id="user-id-display"></span></p>
                 <p id="app-id-display" class="text-gray-600 mt-1"></p>
             </footer>
         </div>
@@ -263,6 +281,7 @@
         // Caching DOM elements
         const bodyEl = document.body;
         const linksContainer = document.getElementById('links-container');
+        const loadingState = document.getElementById('loading-state'); 
         const statusMessage = document.getElementById('status-message');
         const linkModal = document.getElementById('link-modal');
         const linkForm = document.getElementById('link-form');
@@ -272,8 +291,9 @@
         const profileNameEl = document.getElementById('user-name');
         const profileBioEl = document.getElementById('user-bio');
 
-        // CẬP NHẬT: Sử dụng URL Render thực tế của người dùng
-        const PUBLIC_BASE_URL = 'https://bioo-link.onrender.com/'; 
+        // --- DÒNG ĐÃ ĐƯỢC CẬP NHẬT THEO YÊU CẦU NGƯỜI DÙNG ---
+        const PUBLIC_BASE_URL = 'https://bioo-link.onrender.com'; 
+        // -------------------------------------------------------------
         
         const BG_DEFAULT_COLOR = '#0d1117';
         const BG_DEFAULT_GRADIENT = 'linear-gradient(135deg, #0d1117 0%, #161b22 100%)';
@@ -298,8 +318,8 @@
             for (let i = 0; i < length; i++) {
                 result += characters.charAt(Math.floor(Math.random() * characters.length));
             }
-            // Thêm dấu / để đảm bảo nó là đường dẫn con
-            return "/" + result; 
+            // Trả về slug (không có dấu / vì nó sẽ được thêm trong displayPublicLink)
+            return result; 
         }
 
         async function initFirebase() {
@@ -365,8 +385,8 @@
          * @param {string} slug 
          */
         function displayPublicLink(slug) {
-            // Slug là "/randomstring", nên thêm trực tiếp vào base URL
-            const fullUrl = PUBLIC_BASE_URL + (slug.startsWith('/') ? slug.substring(1) : slug); 
+            // Slug là "randomstring", thêm dấu / để tạo đường dẫn con
+            const fullUrl = `${PUBLIC_BASE_URL}/${slug}`; 
             document.getElementById('public-link-display').textContent = fullUrl;
 
             const copyButton = document.getElementById('copy-link-button');
@@ -440,6 +460,7 @@
             
             onSnapshot(q, (snapshot) => {
                 statusMessage.classList.add('hidden'); 
+                loadingState.classList.add('hidden'); // Ẩn trạng thái loading khi có dữ liệu
                 linksData = [];
                 snapshot.forEach((doc) => {
                     linksData.push({ id: doc.id, ...doc.data() });
@@ -447,6 +468,8 @@
                 renderItems();
             }, (error) => {
                 console.error("Lỗi tải liên kết:", error);
+                loadingState.classList.remove('hidden'); // Giữ lại hoặc hiển thị lại lỗi
+                loadingState.innerHTML = '<p class="text-red-400">Lỗi tải dữ liệu. Vui lòng kiểm tra kết nối!</p>';
                 showTemporaryMessage("Lỗi tải liên kết!", 'bg-red-600');
             });
         }
@@ -454,6 +477,10 @@
         // --- CRUD & IMAGE UPLOAD OPERATIONS ---
 
         async function setProfileData(data) {
+            if (!userId) {
+                console.error("Không thể lưu: User ID chưa sẵn sàng.");
+                return;
+            }
             try {
                 await setDoc(getProfileDocRef(), data, { merge: true });
             } catch (error) {
@@ -463,6 +490,10 @@
         
         async function handleImageUploadAndSave(file) {
             if (!file) return;
+            if (!userId) {
+                showTemporaryMessage("Lỗi: Chưa xác thực người dùng. Vui lòng chờ.", 'bg-red-600');
+                return;
+            }
 
             if (file.size > 5 * 1024 * 1024) { // 5MB limit
                  showTemporaryMessage("Lỗi: Kích thước tệp tối đa là 5MB.", 'bg-red-600');
@@ -503,6 +534,11 @@
         }
 
         async function saveLink(linkId, data) {
+            // BẢO VỆ GHI DỮ LIỆU: Đảm bảo userId đã sẵn sàng
+            if (!userId) {
+                showTemporaryMessage("Lỗi: Chưa xác thực người dùng. Vui lòng chờ vài giây trước khi lưu.", 'bg-red-600');
+                return;
+            }
             showTemporaryMessage("Đang lưu liên kết...");
             try {
                 if (linkId) {
@@ -514,11 +550,17 @@
                 closeModal(linkModal);
             } catch (error) {
                 console.error("Lỗi lưu liên kết:", error);
-                showTemporaryMessage("Lỗi: Không thể lưu liên kết!", 'bg-red-600');
+                showTemporaryMessage("Lỗi: Không thể lưu liên kết! (Kiểm tra console)", 'bg-red-600');
             }
         }
 
         async function addTextBlock() {
+            // BẢO VỆ GHI DỮ LIỆU: Đảm bảo userId đã sẵn sàng
+            if (!userId) {
+                showTemporaryMessage("Lỗi: Chưa xác thực người dùng. Vui lòng chờ vài giây trước khi thêm.", 'bg-red-600');
+                return;
+            }
+            
             showTemporaryMessage("Đang thêm văn bản...");
             try {
                 const newOrder = linksData.length > 0 ? linksData[linksData.length - 1].order + 1 : 0;
@@ -529,11 +571,12 @@
                 });
             } catch (error) {
                 console.error("Lỗi thêm văn bản:", error);
-                showTemporaryMessage("Lỗi: Không thể thêm văn bản!", 'bg-red-600');
+                showTemporaryMessage("Lỗi: Không thể thêm văn bản! (Kiểm tra console)", 'bg-red-600');
             }
         }
 
         async function updateTextBlockContent(itemId, content) {
+             if (!userId) return;
              try {
                 await updateDoc(doc(getLinksCollectionRef(), itemId), { content });
             } catch (error) {
@@ -542,22 +585,21 @@
         }
 
         async function deleteItem(itemId) {
-            if (!itemId) return;
-
-            if (confirm("Bạn có chắc chắn muốn xóa mục này?")) {
-                showTemporaryMessage("Đang xóa mục...");
-                try {
-                    await deleteDoc(doc(getLinksCollectionRef(), itemId));
-                    closeModal(linkModal);
-                } catch (error) {
-                    console.error("Lỗi xóa mục:", error);
-                    showTemporaryMessage("Lỗi: Không thể xóa mục!", 'bg-red-600');
-                }
+            if (!userId) return;
+            // Thay thế confirm() bằng modal/messagebox
+            showTemporaryMessage("Đang xóa mục...", 'bg-yellow-600');
+            try {
+                await deleteDoc(doc(getLinksCollectionRef(), itemId));
+                closeModal(linkModal);
+                showTemporaryMessage("Đã xóa mục thành công.", 'bg-green-600');
+            } catch (error) {
+                console.error("Lỗi xóa mục:", error);
+                showTemporaryMessage("Lỗi: Không thể xóa mục!", 'bg-red-600');
             }
         }
 
         async function updateItemOrderInFirestore() {
-            if (!db) return;
+            if (!db || !userId) return;
             
             showTemporaryMessage("Đang cập nhật thứ tự...", 'bg-yellow-600');
 
@@ -600,6 +642,7 @@
                 const placeholder = document.createElement('div');
                 placeholder.className = 'drop-placeholder h-1 bg-indigo-500 rounded-full transition-all duration-150';
                 
+                // Xác định vị trí chèn placeholder
                 if (e.clientY < targetCenterY) {
                     linksContainer.insertBefore(placeholder, target);
                 } else {
@@ -617,24 +660,46 @@
             linksContainer.querySelectorAll('.drop-placeholder').forEach(p => p.remove());
 
             if (draggedItem) {
-                const dropTarget = e.currentTarget;
+                const oldId = draggedItem.id;
                 
-                const children = Array.from(linksContainer.children).filter(el => !el.classList.contains('drop-placeholder'));
+                // Lấy chỉ mục cũ của item trong linksData
+                const oldIndex = linksData.findIndex(item => item.id === oldId);
                 
-                const oldIndex = children.indexOf(draggedItem);
-                let newIndex = children.indexOf(dropTarget);
+                // Tìm vị trí mới dựa trên thứ tự DOM
+                // Phải lọc bỏ loadingState vì nó không phải item kéo thả
+                const children = Array.from(linksContainer.children).filter(el => !el.classList.contains('drop-placeholder') && el.id !== 'loading-state');
+                
+                // Tìm chỉ mục mới của item đã kéo sau khi kéo thả (trong danh sách children đã lọc)
+                const targetElement = e.target.closest('.link-item, .text-block-item');
+                let newIndex = -1;
 
-                if (e.clientY < dropTarget.getBoundingClientRect().y + dropTarget.getBoundingClientRect().height / 2) {
-                    linksContainer.insertBefore(draggedItem, dropTarget);
+                if (targetElement) {
+                    newIndex = children.indexOf(targetElement);
                 } else {
-                    linksContainer.insertBefore(draggedItem, dropTarget.nextSibling);
-                    newIndex++; 
-                }
-                
-                const [movedItem] = linksData.splice(oldIndex, 1);
-                linksData.splice(newIndex > oldIndex ? newIndex - 1 : newIndex, 0, movedItem);
+                    // Nếu thả vào vùng trống (ví dụ: phía dưới cùng)
+                    const lastChild = children[children.length - 1];
+                    const lastRect = lastChild ? lastChild.getBoundingClientRect() : null;
 
-                updateItemOrderInFirestore();
+                    if (!lastRect || e.clientY > lastRect.bottom) {
+                        newIndex = children.length - 1; // Đặt ở cuối
+                    } else {
+                        // Nếu không tìm thấy targetElement, dùng chỉ mục của phần tử gần nhất
+                        newIndex = Array.from(linksContainer.children).indexOf(draggedItem);
+                    }
+                }
+
+                // Cập nhật linksData
+                if (oldIndex !== -1 && newIndex !== -1) {
+                    const [movedItem] = linksData.splice(oldIndex, 1);
+                    // Điều chỉnh splice index nếu target là placeholder
+                    if (e.target.classList.contains('drop-placeholder') && e.clientY < e.target.getBoundingClientRect().y + e.target.getBoundingClientRect().height / 2) {
+                        linksData.splice(newIndex, 0, movedItem);
+                    } else {
+                        linksData.splice(newIndex, 0, movedItem);
+                    }
+
+                    updateItemOrderInFirestore();
+                }
             }
         }
 
@@ -649,6 +714,7 @@
 
         function renderItems() {
             linksContainer.innerHTML = '';
+            
             if (linksData.length === 0) {
                  linksContainer.innerHTML = '<p class="text-center text-gray-500 text-sm italic py-4">Chưa có nội dung nào. Hãy thêm Link hoặc Văn Bản!</p>';
                  return;
@@ -684,7 +750,7 @@
                 } else if (item.type === 'text_block') {
                     // --- RENDER TEXT BLOCK ---
                     wrapper.className = 'text-block-item bg-gray-900/50 text-base text-gray-300 relative group cursor-grab';
-                    wrapper.innerHTML = item.content || 'Nhấp để chỉnh sửa nội dung...';
+                    wrapper.innerHTML = item.content || 'Nhấp để chỉnh sửa nội dung văn bản này.';
                     wrapper.setAttribute('contenteditable', 'true');
                     wrapper.title = 'Nhấp và chỉnh sửa trực tiếp, sau đó nhấp ra ngoài để lưu.';
                     
@@ -702,7 +768,8 @@
                     });
 
                     const deleteButton = createEditButton('trash-2', 'Xóa văn bản', () => deleteItem(item.id));
-                    wrapper.appendChild(createControlsContainer([deleteButton]));
+                    // Text blocks không có nút edit, chỉ có nút delete và drag handle
+                    wrapper.appendChild(createControlsContainer([deleteButton])); 
                 }
 
                 linksContainer.appendChild(wrapper);
@@ -788,7 +855,8 @@
                     } else {
                          bgTypeEl.value = 'default';
                     }
-                    toggleBgFields();
+                    // Gọi hàm để hiển thị/ẩn các trường input ngay cả khi chỉ mở modal
+                    toggleBgFields(); 
                 }
             });
 
@@ -809,6 +877,7 @@
         document.getElementById('add-text-button').addEventListener('click', addTextBlock);
         document.getElementById('customize-background-button').addEventListener('click', openBackgroundModal);
         
+        // Gắn sự kiện change để bật/tắt trường input khi loại nền thay đổi
         document.getElementById('bg-type').addEventListener('change', toggleBgFields);
         document.getElementById('close-bg-modal-button').addEventListener('click', () => closeModal(bgModal));
         document.getElementById('close-link-modal-button').addEventListener('click', () => closeModal(linkModal));
@@ -817,6 +886,12 @@
         // Xử lý Form Lưu Background
         bgForm.addEventListener('submit', (e) => {
             e.preventDefault();
+            
+            if (!userId) {
+                showTemporaryMessage("Lỗi: Chưa xác thực người dùng. Vui lòng chờ.", 'bg-red-600');
+                return;
+            }
+
             const type = document.getElementById('bg-type').value;
 
             if (type === 'image_upload') {
@@ -850,6 +925,7 @@
         document.getElementById('delete-link-button').addEventListener('click', () => {
             const linkId = document.getElementById('link-id').value;
             if (linkId) {
+                showTemporaryMessage("Đã bắt đầu xóa mục. Vui lòng chờ.", 'bg-yellow-600');
                 deleteItem(linkId);
             }
         });
